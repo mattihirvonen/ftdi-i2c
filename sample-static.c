@@ -573,6 +573,17 @@ void TestDeviceADC()
 #endif // NEW_APPLICATION
 //-----------------------------------------------------------------------------------
 
+
+/*
+static uint32 i2c_write( uint8 slaveAddress, uint32 bytesToTransfer, uint32 &bytesTransfered, uint32 options )
+{
+    start_time();
+    status = I2C_DeviceWrite(ftHandle, slaveAddress, bytesToTransfer, buffer, &bytesTransfered, options);
+    timeWrite = stop_time();
+    return status;
+}
+*/
+
 static FT_STATUS write_bytes( i2c_t *i2c )
 {
     FT_STATUS status;
@@ -580,7 +591,6 @@ static FT_STATUS write_bytes( i2c_t *i2c )
     uint32 bytesTransfered = 0;
     uint32 options = 0;
     uint32 trials = 0;
-
 
     uint8        slaveAddress = i2c->addr;
     const uint8 *data         = i2c->wdata;
@@ -596,6 +606,8 @@ static FT_STATUS write_bytes( i2c_t *i2c )
     start_time();
     status = I2C_DeviceWrite(ftHandle, slaveAddress, bytesToTransfer, buffer, &bytesTransfered, options);
     timeWrite = stop_time();
+
+    // (Re)write if required
     while (status != FT_OK && trials < 10)
     {
         APP_CHECK_STATUS_NOEXIT(status);
@@ -777,7 +789,6 @@ int main( int argc, char *argv[] )
     uint32 channels = 0;
     uint32 i = 0;
 
-
     // Initialize libMPSSE library
     if (!initialize_library())
     {
@@ -787,7 +798,7 @@ int main( int argc, char *argv[] )
 
     // Initialize channel configurations
     memset(&channelConf, 0, sizeof(channelConf));
-    channelConf.ClockRate = I2C_CLOCK_FAST_MODE;
+    channelConf.ClockRate = I2C_CLOCK_FAST_MODE;   // I2C_CLOCK_STANDARD_MODE
 
     if ( i2c.fast_transfer ) channelConf.LatencyTimer = 1;
     else                     channelConf.LatencyTimer = 255;
