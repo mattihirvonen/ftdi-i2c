@@ -104,7 +104,7 @@ typedef struct
 static FT_HANDLE ftHandle;
 static uint8  buffer[I2C_DEVICE_BUFFER_SIZE] = {0};
 static uint32 timeWrite = 0;
-//static uint32 timeRead  = 0;
+static uint32 timeRead  = 0;
 #ifdef _WIN32
 static LARGE_INTEGER llTimeStart = {0};
 static LARGE_INTEGER llTimeEnd = {0};
@@ -584,13 +584,13 @@ static uint32 i2c_write( uint8 slaveAddress, uint32 bytesToTransfer, uint32 &byt
 }
 */
 
-static FT_STATUS write_bytes( i2c_t *i2c )
+static FT_STATUS i2c_write_bytes( i2c_t *i2c )
 {
     FT_STATUS status;
     uint32 bytesToTransfer = 0;
     uint32 bytesTransfered = 0;
-    uint32 options = 0;
-    uint32 trials = 0;
+    uint32 options         = 0;
+    uint32 trials;
 
     uint8        slaveAddress = i2c->addr;
     const uint8 *data         = i2c->wdata;
@@ -608,13 +608,50 @@ static FT_STATUS write_bytes( i2c_t *i2c )
     timeWrite = stop_time();
 
     // (Re)write if required
-    while (status != FT_OK && trials < 10)
+    for (trials = 0; status != FT_OK && trials < 10; trials++)
     {
         APP_CHECK_STATUS_NOEXIT(status);
         start_time();
         status = I2C_DeviceWrite(ftHandle, slaveAddress, bytesToTransfer, buffer, &bytesTransfered, options);
         timeWrite = stop_time();
-        trials++;
+    }
+    return status;
+}
+
+
+static FT_STATUS i2c_read_bytes( i2c_t *i2c )
+{
+    FT_STATUS status       = FT_OK;
+    uint32 bytesToTransfer = 0;
+    uint32 bytesTransfered = 0;
+    uint32 options         = 0;
+    int32  trials;
+
+    uint8     slaveAddress = i2c->addr;
+    uint8    *data         = i2c->rdata;
+    uint32    numBytes     = i2c->read;
+
+    options = I2C_TRANSFER_OPTIONS_START_BIT|I2C_TRANSFER_OPTIONS_STOP_BIT;
+    if ( i2c->fast_transfer ) {
+        options |= I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES;
+    }
+    bytesToTransfer += numBytes;
+
+    start_time();
+    status  |= I2C_DeviceRead(ftHandle, slaveAddress, bytesToTransfer, buffer, &bytesTransfered, options);
+    timeRead = stop_time();
+
+    // (Re)read if required
+    for (trials = 0; status != FT_OK && trials < 10; trials++)
+    {
+        APP_CHECK_STATUS_NOEXIT(status);
+        start_time();
+        status = I2C_DeviceRead(ftHandle, slaveAddress, bytesToTransfer, buffer, &bytesTransfered, options);
+        timeRead = stop_time();
+    }
+    if (status == FT_OK)
+    {
+        memcpy(data, buffer, bytesToTransfer);
     }
     return status;
 }
@@ -652,12 +689,27 @@ void TestI2C( i2c_t *i2c )
     if ( !i2c->addr   )  return;
 
     // Write the data
-    if ( i2c->addr && i2c->write )
+    if ( i2c->write )
     {
-        FT_STATUS status = write_bytes( i2c );
+        FT_STATUS status = i2c_write_bytes( i2c );
 
         APP_CHECK_STATUS(status);
-        printf("write_bytes %d\n", status);
+        printf("write bytes %d\n", status);
+        //Sleep(1000);
+    }
+    if ( i2c->read )
+    {
+        FT_STATUS status = i2c_read_bytes( i2c );
+
+        APP_CHECK_STATUS(status);
+        printf("read  bytes %d\n -", status);
+
+        int  i;
+        for (i = 0; i < i2c->read; i++)
+        {
+            printf( " 0x02X", i2c->rdata[i] );
+        }
+        printf("\n");
         //Sleep(1000);
     }
 
