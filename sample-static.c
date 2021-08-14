@@ -684,8 +684,8 @@ void print_help( char *command )
     printf(" -d               dry run mode to test command line args\n");
     printf(" -f               fast transfer mode\n");
     printf(" -a I2Caddr       I2C device address (1..0x7f)\n");
-    printf(" -w datalist      comma delimited bytelist (decimal or 0x hex values)\n");
-    printf(" -r readcount     count of bytes to read fron I2C device\n");
+    printf(" -w datalist      comma delimited byte list (decimal or 0x hex values)\n");
+    printf(" -r readcount     count of bytes to read from I2C device\n");
     printf(" -v               verbose mode\n");
     exit( 0 );
 }
@@ -788,11 +788,9 @@ int main( int argc, char *argv[] )
     // Initialize channel configurations
     memset(&channelConf, 0, sizeof(channelConf));
     channelConf.ClockRate = I2C_CLOCK_FAST_MODE;
-#if FAST_TRANSFER
-    channelConf.LatencyTimer = 1;
-#else // FAST_TRANSFER
-    channelConf.LatencyTimer = 255;
-#endif // FAST_TRANSFER
+
+    if ( i2c.fast_transfer ) channelConf.LatencyTimer = 1;
+    else                     channelConf.LatencyTimer = 255;
 
     // Get the number of channels
     status = I2C_GetNumChannels(&channels);
