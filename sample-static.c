@@ -34,9 +34,12 @@
 /* 							 Include files										   */
 /******************************************************************************/
 /* Standard C libraries */
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>  // getopt()
+
+
 /* OS specific libraries */
 #ifdef _WIN32
 #include<windows.h>
@@ -83,13 +86,25 @@
 #define CATCH_GLITCH					0
 
 
+typedef struct
+{
+    int      verbose;
+    int      dryrun;
+    int      fast_transfer;
+    int      write;
+    int      read;
+    uint8_t  wdata[16];
+    uint8_t  rdata[16];
+    uint8_t  addr;
+} i2c_t;
+
 /******************************************************************************/
 /*								Global variables							  	    */
 /******************************************************************************/
 static FT_HANDLE ftHandle;
-static uint8 buffer[I2C_DEVICE_BUFFER_SIZE] = {0};
+static uint8  buffer[I2C_DEVICE_BUFFER_SIZE] = {0};
 static uint32 timeWrite = 0;
-static uint32 timeRead = 0;
+//static uint32 timeRead  = 0;
 #ifdef _WIN32
 static LARGE_INTEGER llTimeStart = {0};
 static LARGE_INTEGER llTimeEnd = {0};
@@ -188,6 +203,9 @@ static uint32 stop_time()
 #endif
     return dwTemp;
 }
+
+//-----------------------------------------------------------------------------------
+#if NEW_APPLICATION == 0
 
 /*!
  * \brief Writes to EEPROM
@@ -314,8 +332,6 @@ static FT_STATUS read_bytes(uint8 slaveAddress, uint8 registerAddress, uint8 bRe
     return status;
 }
 
-//-----------------------------------------------------------------------------------
-#if NEW_APPLICATION == 0
 
 /*!
  * \brief EEPROM testing / Entry point of the sample application for testing EEPROM
@@ -557,10 +573,170 @@ void TestDeviceADC()
 #endif // NEW_APPLICATION
 //-----------------------------------------------------------------------------------
 
-void TestI2Cpot( int i2c_addr, int reg_nr, int reg_value )
+static FT_STATUS write_bytes( i2c_t *i2c )
 {
-    printf("- addr=0x%x  reg=0x%x  value=%d\n", i2c_addr, reg_nr, reg_value );
+    FT_STATUS status;
+    uint32 bytesToTransfer = 0;
+    uint32 bytesTransfered = 0;
+    uint32 options = 0;
+    uint32 trials = 0;
+
+
+    uint8        slaveAddress = i2c->addr;
+    const uint8 *data         = i2c->wdata;
+    uint32       numBytes     = i2c->write;
+
+    options = I2C_TRANSFER_OPTIONS_START_BIT|I2C_TRANSFER_OPTIONS_STOP_BIT;
+    if ( i2c->fast_transfer ) {
+        options |= I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES;
+    }
+    memcpy(buffer + bytesToTransfer, data, numBytes);
+    bytesToTransfer += numBytes;
+
+    start_time();
+    status = I2C_DeviceWrite(ftHandle, slaveAddress, bytesToTransfer, buffer, &bytesTransfered, options);
+    timeWrite = stop_time();
+    while (status != FT_OK && trials < 10)
+    {
+        APP_CHECK_STATUS_NOEXIT(status);
+        start_time();
+        status = I2C_DeviceWrite(ftHandle, slaveAddress, bytesToTransfer, buffer, &bytesTransfered, options);
+        timeWrite = stop_time();
+        trials++;
+    }
+    return status;
+}
+
+
+void TestI2C( i2c_t *i2c )
+{
+    uint8_t txdata[32];
+    int     txix = 0;
+
+    if ( !i2c->write && !i2c->read ) {
+        printf("No valid I2C operation command\n");
+        return;
+    }
+    if ( i2c->addr ) {
+        txdata[txix++] = (i2c->addr << 1) | (i2c->read ? 1:0);
+    }
+    if ( i2c->write ) {
+        uint8_t *dp = i2c->wdata;
+
+        while ( i2c->write-- )
+           txdata[txix++] = *dp++;
+    }
+
+    if ( i2c->verbose ) {
+        int ix;
+
+        printf("-- Fast=%d  Read=%d  TXdata(%d): ", i2c->fast_transfer, i2c->read, txix);
+        for( ix = 0; ix < txix; ix++ ) {
+            printf(" 0x%02X", txdata[ix] );
+        }
+        printf("\n" );
+    }
+    if (  i2c->dryrun )  return;
+    if ( !i2c->addr   )  return;
+
+    // Write the data
+    if ( i2c->addr && i2c->write )
+    {
+        FT_STATUS status = write_bytes( i2c );
+
+        APP_CHECK_STATUS(status);
+        printf("write_bytes %d\n", status);
+        //Sleep(1000);
+    }
+
     return;
+}
+
+
+int parse_wdata( uint8_t *wdata, char *txt )
+{
+    char *endp = txt;
+    int   ix   = 0;
+
+    while ( endp )
+    {
+        #if 0
+        printf( "-- %d <%s>\n", strlen(endp), endp);
+        #endif
+        wdata[ix++] = strtol( endp, &endp, 0 );
+
+        if ( *endp == '#' )   endp  = 0;
+        else                  endp += 1;
+    }
+    return ix;
+}
+
+
+void print_help( char *command )
+{
+    char txt[256];
+
+    strcpy( txt, command );
+    printf("\n");
+    printf("Usage:  %s  [-d] [-v] [-f] -a I2Caddr [-r readcount] [-w datalist]\n", txt );
+    printf("\n");
+    printf(" -?               this help\n");
+    printf(" -d               dry run mode to test command line args\n");
+    printf(" -f               fast transfer mode\n");
+    printf(" -a I2Caddr       I2C device address (1..0x7f)\n");
+    printf(" -w datalist      comma delimited bytelist (decimal or 0x hex values)\n");
+    printf(" -r readcount     count of bytes to read fron I2C device\n");
+    printf(" -v               verbose mode\n");
+    exit( 0 );
+}
+
+
+int parse_args( int argc, char *argv[], i2c_t *i2c )
+{
+    int  c;
+    char optlist[] = "?dvfa:w:r:";
+    char txt[128];
+
+    while ((c = getopt (argc, argv, optlist)) != -1)
+    {
+        switch (c)
+        {
+            case '?':
+                print_help( argv[0] );
+                break;
+
+            case 'd':
+                i2c->dryrun = 1;
+                break;
+
+            case 'v':
+                i2c->verbose = 1;
+                break;
+
+            case 'f':
+                i2c->fast_transfer = 1;
+                break;
+
+            case 'a':
+                i2c->addr = strtol( optarg, 0, 0 );
+                break;
+
+            case 'r':
+                i2c->read = strtol( optarg, 0, 0 );
+                break;
+
+            case 'w':
+                strcpy( txt, optarg );
+                strcat( txt, "#" );
+                i2c->write = parse_wdata( i2c->wdata, txt );
+                break;
+
+            default:
+            //  abort();
+                break;
+        }
+    }
+    return 0;
 }
 
 
@@ -579,25 +755,20 @@ void TestI2Cpot( int i2c_addr, int reg_nr, int reg_value )
  */
 int main( int argc, char *argv[] )
 {
-    int i2c_addr  = 0x11;
-    int reg_nr    = 1;
-    int reg_value = -1;
+    i2c_t  i2c;
+
+    memset( &i2c, 0, sizeof(i2c) );
 
     if ( argc == 1 )
     {
-        char txt[256];
-
-        strcpy( txt, argv[0] );
-        printf("Usage:  %s [i2c-addr] [reg-nr] [reg-value]\n\n", txt );
+        return 0;
     }
-    else if ( argc < 3 ) return 1;
+    parse_args( argc, argv, &i2c );
 
-    if ( argc >= 3 ) {
-        i2c_addr  = strtol( argv[1], 0, 0 );
-        reg_nr    = strtol( argv[2], 0, 0 );
-    }
-    if ( argc > 3 ) {
-        reg_value = strtol( argv[3], 0, 0 );
+    if ( i2c.dryrun ) {
+         i2c.verbose = 1;
+         TestI2C( &i2c );
+         return 0;
     }
 
     FT_STATUS status = FT_OK;
@@ -658,9 +829,7 @@ int main( int argc, char *argv[] )
         init_time();
 
 #if NEW_APPLICATION
-        if ( argc >= 3 ) {
-            TestI2Cpot( i2c_addr, reg_nr, reg_value );
-        }
+        TestI2C( &i2c );
 #else
 #if TEST_EEPROM
         TestDeviceEEPROM();
