@@ -30,6 +30,15 @@
  *					Added testing of ADC I2C device in addition to the EEPROM I2C device
  */
 
+ /*
+ Google search:  ftdi i2c example
+
+ https://ftdichip.com/software-examples/mpsse-projects/libmpsse-i2c-examples/
+ https://ftdichip.com/wp-content/uploads/2020/08/AN_177_User_Guide_For_LibMPSSE-I2C.pdf
+ http://ftdichip.com/Documents/AppNotes/AN_113_FTDI_Hi_Speed_USB_To_I2C_Example.pdf
+ https://ftdichip.com/wp-content/uploads/2020/08/AN_255_USB-to-I2C-Example-using-the-FT232H-and-FT201X-devices-1.pdf
+ */
+
 /******************************************************************************/
 /* 							 Include files										   */
 /******************************************************************************/
@@ -850,7 +859,11 @@ int main( int argc, char *argv[] )
 
     // Initialize channel configurations
     memset(&channelConf, 0, sizeof(channelConf));
-    channelConf.ClockRate = I2C_CLOCK_FAST_MODE;   // I2C_CLOCK_STANDARD_MODE
+    #if 1
+    channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE;
+    #else
+    channelConf.ClockRate = I2C_CLOCK_FAST_MODE;
+    #endif
 
     if ( i2c.fast_transfer ) channelConf.LatencyTimer = 1;
     else                     channelConf.LatencyTimer = 255;
