@@ -36,6 +36,8 @@
 			<Add library="libMPSSE.a" />
 			<Add directory="." />
 		</Linker>
+		<Unit filename=".gitignore" />
+		<Unit filename="README.md" />
 		<Unit filename="ftd2xx.h" />
 		<Unit filename="libMPSSE_i2c.h" />
 		<Unit filename="sample-static.c">
