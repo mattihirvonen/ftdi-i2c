@@ -1,0 +1,28 @@
+# depslib dependency file v1.0
+1628861601 source:d:\proj\ftdi\i2c\sample-static.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<windows.h>
+	"ftd2xx.h"
+	"libMPSSE_i2c.h"
+
+1628861601 d:\proj\ftdi\i2c\ftd2xx.h
+
+1628861601 d:\proj\ftdi\i2c\libmpsse_i2c.h
+	"ftd2xx.h"
+
+1628928721 source:d:\proj\ftdi\ftdi-i2c\sample-static.c
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<unistd.h>
+	<windows.h>
+	"ftd2xx.h"
+	"libMPSSE_i2c.h"
+
+1628861601 d:\proj\ftdi\ftdi-i2c\ftd2xx.h
+
+1628861601 d:\proj\ftdi\ftdi-i2c\libmpsse_i2c.h
+	"ftd2xx.h"
+

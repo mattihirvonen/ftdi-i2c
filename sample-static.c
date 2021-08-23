@@ -716,7 +716,7 @@ void TestI2C( i2c_t *i2c )
         int  i;
         for (i = 0; i < i2c->read; i++)
         {
-            printf( " 0x02X", i2c->rdata[i] );
+            printf( " 0x%02X", i2c->rdata[i] );
         }
         printf("\n");
         //Sleep(1000);
