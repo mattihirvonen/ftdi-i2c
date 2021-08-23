@@ -675,9 +675,11 @@ void TestI2C( i2c_t *i2c )
         printf("No valid I2C operation command\n");
         return;
     }
+    /*
     if ( i2c->addr ) {
         txdata[txix++] = (i2c->addr << 1) | (i2c->read ? 1:0);
     }
+    */
     if ( i2c->write ) {
         uint8_t *dp = i2c->wdata;
 
