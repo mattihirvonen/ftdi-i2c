@@ -668,52 +668,54 @@ static FT_STATUS i2c_read_bytes( i2c_t *i2c )
 
 void TestI2C( i2c_t *i2c )
 {
-    uint8_t txdata[32];
-    int     txix = 0;
-
-    if ( !i2c->write && !i2c->read ) {
-        printf("No valid I2C operation command\n");
+    if ( !i2c->addr ) {
+        printf("No valid I2C address\n");
         return;
     }
-    /*
-    if ( i2c->addr ) {
-        txdata[txix++] = (i2c->addr << 1) | (i2c->read ? 1:0);
+    if ( !i2c->write && !i2c->read ) {
+        printf("No valid I2C rd/wr operation\n");
+        return;
     }
-    */
-    if ( i2c->write ) {
-        uint8_t *dp = i2c->wdata;
-
-        while ( i2c->write-- )
-           txdata[txix++] = *dp++;
-    }
-
-    if ( i2c->verbose ) {
-        int ix;
-
-        printf("-- Fast=%d  Read=%d  TXdata(%d): ", i2c->fast_transfer, i2c->read, txix);
-        for( ix = 0; ix < txix; ix++ ) {
-            printf(" 0x%02X", txdata[ix] );
-        }
-        printf("\n" );
-    }
-    if (  i2c->dryrun )  return;
-    if ( !i2c->addr   )  return;
 
     // Write the data
     if ( i2c->write )
     {
+        if ( i2c->verbose ) {
+            printf("-- Fast=%d, Write=%d bytes -", i2c->fast_transfer, i2c->write);
+
+            int  ix;
+            for( ix = 0; ix < i2c->write; ix++ ) {
+                printf(" 0x%02X", i2c->wdata[ix] );
+            }
+            printf("\n" );
+        }
+
+        if (  i2c->dryrun )  return;
+
         FT_STATUS status = i2c_write_bytes( i2c );
 
         APP_CHECK_STATUS(status);
-        printf("write bytes %d\n", status);
+        printf("-- status: write %d bytes\n", status);
         //Sleep(1000);
     }
     if ( i2c->read )
     {
+        if ( i2c->verbose ) {
+            printf("-- Fast=%d, Read=%d bytes -", i2c->fast_transfer, i2c->read);
+
+            int ix;
+            for( ix = 0; ix < i2c->write; ix++ ) {
+                printf(" 0x%02X", i2c->wdata[ix] );
+            }
+            printf("\n" );
+        }
+
+        if (  i2c->dryrun )  return;
+
         FT_STATUS status = i2c_read_bytes( i2c );
 
         APP_CHECK_STATUS(status);
-        printf("read  bytes %d\n -", status);
+        printf("read %d bytes\n -", status);
 
         int  i;
         for (i = 0; i < i2c->read; i++)
